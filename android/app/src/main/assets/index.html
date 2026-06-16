@@ -606,8 +606,17 @@
             <input type="datetime-local" id="inputDate">
         </div>
         <div class="form-group">
-          <label>备注（可选）</label>
-          <div class="note-options" id="recordNoteOptions">
+          <label>时段 <span style="font-weight:400;color:var(--text-secondary);font-size:11px;">（自动选择）</span></label>
+          <div class="note-options" id="timeNoteOptions">
+            <button class="note-opt" data-value="早上">早上</button>
+            <button class="note-opt" data-value="中午">中午</button>
+            <button class="note-opt" data-value="下午">下午</button>
+            <button class="note-opt" data-value="晚上">晚上</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>状态</label>
+          <div class="note-options" id="contextNoteOptions">
             <button class="note-opt" data-value="饭前">饭前</button>
             <button class="note-opt" data-value="饭后">饭后</button>
             <button class="note-opt" data-value="运动后">运动后</button>
@@ -733,8 +742,17 @@
           <input type="datetime-local" id="editDate">
       </div>
       <div class="form-group">
-        <label>备注</label>
-        <div class="note-options" id="editNoteOptions">
+        <label>时段</label>
+        <div class="note-options" id="editTimeNoteOptions">
+          <button class="note-opt" data-value="早上">早上</button>
+          <button class="note-opt" data-value="中午">中午</button>
+          <button class="note-opt" data-value="下午">下午</button>
+          <button class="note-opt" data-value="晚上">晚上</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>状态</label>
+        <div class="note-options" id="editContextNoteOptions">
           <button class="note-opt" data-value="饭前">饭前</button>
           <button class="note-opt" data-value="饭后">饭后</button>
           <button class="note-opt" data-value="运动后">运动后</button>
@@ -1018,19 +1036,22 @@
 
     function setupNoteOptions(containerId, inputId) {
       const container = document.getElementById(containerId);
-      const input = document.getElementById(inputId);
+      const hasCustom = !!inputId;
+      const input = hasCustom ? document.getElementById(inputId) : null;
       container.querySelectorAll('.note-opt').forEach(btn => {
         btn.addEventListener('click', function() {
           container.querySelectorAll('.note-opt').forEach(b => b.classList.remove('active'));
           this.classList.add('active');
-          const val = this.dataset.value;
-          if (val === '') {
-            input.style.display = 'block';
-            input.value = '';
-            input.focus();
-          } else {
-            input.style.display = 'none';
-            input.value = val;
+          if (hasCustom) {
+            const val = this.dataset.value;
+            if (val === '') {
+              input.style.display = 'block';
+              input.value = '';
+              input.focus();
+            } else {
+              input.style.display = 'none';
+              input.value = val;
+            }
           }
         });
       });
@@ -1038,24 +1059,59 @@
 
     function setNoteValue(containerId, inputId, value) {
       const container = document.getElementById(containerId);
-      const input = document.getElementById(inputId);
+      const input = inputId ? document.getElementById(inputId) : null;
       const matched = container.querySelector('.note-opt[data-value="' + value + '"]');
       container.querySelectorAll('.note-opt').forEach(b => b.classList.remove('active'));
       if (matched) {
         matched.classList.add('active');
-        input.style.display = 'none';
-        input.value = value;
-      } else {
+        if (input) {
+          input.style.display = 'none';
+          input.value = value;
+        }
+      } else if (input) {
         const custom = container.querySelector('.note-opt[data-value=""]');
-        custom.classList.add('active');
-        input.style.display = 'block';
-        input.value = value || '';
+        if (custom) {
+          custom.classList.add('active');
+          input.style.display = 'block';
+          input.value = value || '';
+        }
       }
     }
 
+    function getSelectedNote(containerId) {
+      const active = document.querySelector('#' + containerId + ' .note-opt.active');
+      return active ? active.dataset.value : '';
+    }
+
+    function parseNote(note) {
+      if (!note) return { time: '', context: '' };
+      const parts = note.split('、');
+      const timeSet = { '早上':1, '中午':1, '下午':1, '晚上':1 };
+      const ctxSet  = { '饭前':1, '饭后':1, '运动后':1 };
+      let time = '', context = '';
+      parts.forEach(p => {
+        if (timeSet[p]) time = p;
+        else if (ctxSet[p] && !context) context = p;
+        else if (!ctxSet[p] && !context) context = p;
+      });
+      return { time, context };
+    }
+
+    function autoSelectTime() {
+      const h = new Date().getHours();
+      let t;
+      if (h < 10) t = '早上';
+      else if (h < 15) t = '中午';
+      else if (h < 19) t = '下午';
+      else t = '晚上';
+      setNoteValue('timeNoteOptions', null, t);
+    }
+
     function resetNoteInput() {
-      const container = document.getElementById('recordNoteOptions');
-      container.querySelectorAll('.note-opt').forEach(b => b.classList.remove('active'));
+      ['timeNoteOptions', 'contextNoteOptions'].forEach(id => {
+        document.getElementById(id).querySelectorAll('.note-opt').forEach(b => b.classList.remove('active'));
+      });
+      autoSelectTime();
       const input = document.getElementById('inputNote');
       input.style.display = 'none';
       input.value = '';
@@ -1136,7 +1192,9 @@
       editingId = id;
       document.getElementById('editWeight').value = record.weight;
       document.getElementById('editDate').value = record.date;
-      setNoteValue('editNoteOptions', 'editNote', record.note || '');
+      const { time, context } = parseNote(record.note || '');
+      setNoteValue('editTimeNoteOptions', null, time);
+      setNoteValue('editContextNoteOptions', 'editNote', context);
       document.getElementById('editModal').classList.add('show');
     }
 
@@ -1148,7 +1206,9 @@
     function saveEdit() {
       const weight = parseFloat(document.getElementById('editWeight').value);
       const date = document.getElementById('editDate').value;
-      const note = document.getElementById('editNote').value.trim();
+      const timePart = getSelectedNote('editTimeNoteOptions');
+      const contextPart = document.getElementById('editNote').value.trim();
+      const note = [timePart, contextPart].filter(Boolean).join('、');
       if (!weight || !date) { showToast('请填写体重和日期'); return; }
       if (editingId === null) return;
       let records = getRecords();
@@ -1373,8 +1433,11 @@
       initAndroidBridge();
 
       // 备注选项
-      setupNoteOptions('recordNoteOptions', 'inputNote');
-      setupNoteOptions('editNoteOptions', 'editNote');
+      setupNoteOptions('timeNoteOptions');
+      setupNoteOptions('contextNoteOptions', 'inputNote');
+      setupNoteOptions('editTimeNoteOptions');
+      setupNoteOptions('editContextNoteOptions', 'editNote');
+      autoSelectTime();
 
       // Tab 切换
       document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1388,7 +1451,9 @@
         const weight = parseFloat(document.getElementById('inputWeight').value);
         if (!weight || weight <= 0) { showToast('请输入有效体重'); return; }
         const date = document.getElementById('inputDate').value;
-        const note = document.getElementById('inputNote').value.trim();
+        const timePart = getSelectedNote('timeNoteOptions');
+        const contextPart = document.getElementById('inputNote').value.trim();
+        const note = [timePart, contextPart].filter(Boolean).join('、');
         const settings = getSettings();
 
         const kgWeight = convertToKg(weight, settings.unit);
