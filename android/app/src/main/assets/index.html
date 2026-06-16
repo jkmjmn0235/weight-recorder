@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>体重记录</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    :root {
+      --bg: #f0faf4;
+      --card-bg: #ffffff;
+      --primary: #2ecc71;
+      --primary-dark: #27ae60;
+      --text: #2c3e50;
+      --text-secondary: #7f8c8d;
+      --border: #e8f5e9;
+      --shadow: 0 2px 12px rgba(46, 204, 113, 0.12);
+      --tab-bg: #ffffff;
+      --danger: #e74c3c;
+      --radius: 14px;
+    }
+    body.dark {
+      --bg: #1a1a2e;
+      --card-bg: #16213e;
+      --primary: #2ecc71;
+      --primary-dark: #27ae60;
+      --text: #ecf0f1;
+      --text-secondary: #95a5a6;
+      --border: #2c3e50;
+      --shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+      --tab-bg: #16213e;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100vh;
+      padding-bottom: 70px;
+      transition: background 0.3s, color 0.3s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--card-bg);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 0 var(--border);
+    }
+    header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .icon-btn {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 50%;
+      transition: background 0.2s;
+      color: var(--text);
+      line-height: 1;
+    }
+    .icon-btn:active {
+      background: var(--border);
+    }
+    main {
+      padding: 16px;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.25s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+      transition: background 0.3s;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    /* 概览卡片 */
+    .overview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .overview-item {
+      text-align: center;
+    }
+    .overview-item .label {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .overview-item .value {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-top: 4px;
+    }
+    .overview-item .value.danger {
+      color: var(--danger);
+    }
+    .overview-item .value.success {
+      color: var(--primary);
+    }
+    .overview-item .unit {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text-secondary);
+    }
+
+    /* 进度条 */
+    .progress-section {
+      margin-top: 14px;
+    }
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+    .progress-bar {
+      height: 8px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-bar-inner {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), #27ae60);
+      border-radius: 4px;
+      transition: width 0.6s ease;
+      width: 0%;
+    }
+
+    /* 表单 */
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--text-secondary);
+    }
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      font-size: 16px;
+      background: var(--card-bg);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus {
+      border-color: var(--primary);
+    }
+    .form-group textarea {
+      resize: none;
+      min-height: 60px;
+    }
+    .form-row {
+      display: flex;
+      gap: 12px;
+    }
+    .form-row .form-group {
+      flex: 1;
+    }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      font-family: inherit;
+    }
+    .btn:active {
+      transform: scale(0.98);
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+    .btn-outline {
+      background: transparent;
+      border: 2px solid var(--border);
+      color: var(--text);
+    }
+    .btn-danger {
+      background: var(--danger);
+      color: #fff;
+    }
+    .btn-sm {
+      padding: 8px 14px;
+      font-size: 13px;
+      width: auto;
+      border-radius: 8px;
+    }
+
+    /* 记录列表 */
+    .record-item {
+      display: flex;
+      align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+    }
+    .record-item:last-child {
+      border-bottom: none;
+    }
+    .record-date {
+      font-size: 13px;
+      color: var(--text-secondary);
+      min-width: 48px;
+    }
+    .record-weight {
+      font-size: 18px;
+      font-weight: 700;
+      flex: 1;
+    }
+    .record-note {
+      font-size: 12px;
+      color: var(--text-secondary);
+      max-width: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .record-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .record-actions button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 4px 6px;
+      border-radius: 6px;
+      color: var(--text-secondary);
+      transition: background 0.2s;
+    }
+    .record-actions button:active {
+      background: var(--border);
+    }
+    .record-actions .delete-btn {
+      color: var(--danger);
+    }
+    .empty-state {
+      text-align: center;
+      padding: 40px 0;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+    .empty-state .icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+    }
+
+    /* 图表 */
+    .chart-container {
+      position: relative;
+      height: 240px;
+    }
+    .chart-period {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .chart-period button {
+      padding: 6px 16px;
+      border: 2px solid var(--border);
+      border-radius: 20px;
+      background: transparent;
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .chart-period button.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    /* 统计卡片 */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+    .stat-item {
+      text-align: center;
+      padding: 12px 6px;
+      background: var(--bg);
+      border-radius: 10px;
+    }
+    .stat-item .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .stat-item .stat-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    .stat-item .stat-value.max { color: var(--danger); }
+    .stat-item .stat-value.min { color: var(--primary); }
+    .stat-item .stat-value.avg { color: var(--text); }
+
+    .trend-list {
+      margin-top: 12px;
+    }
+    .trend-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .trend-item:last-child {
+      border-bottom: none;
+    }
+    .trend-item .change {
+      font-weight: 600;
+    }
+    .trend-item .change.positive { color: var(--danger); }
+    .trend-item .change.negative { color: var(--primary); }
+
+    /* 设置页面 */
+    .setting-group {
+      margin-bottom: 20px;
+    }
+    .setting-group:last-child {
+      margin-bottom: 0;
+    }
+    .setting-label {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+    .unit-options {
+      display: flex;
+      gap: 10px;
+    }
+    .unit-option {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+      background: var(--card-bg);
+      color: var(--text);
+      font-family: inherit;
+    }
+    .unit-option.active {
+      border-color: var(--primary);
+      background: rgba(46, 204, 113, 0.1);
+      color: var(--primary);
+    }
+    .note-options {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .note-opt {
+      padding: 8px 18px;
+      border: 2px solid var(--border);
+      border-radius: 20px;
+      background: transparent;
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .note-opt.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    /* Tab 栏 */
+    .tab-bar {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 480px;
+      background: var(--tab-bg);
+      display: flex;
+      border-top: 1px solid var(--border);
+      z-index: 100;
+      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 0 8px;
+      border: none;
+      background: none;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      font-family: inherit;
+      transition: color 0.2s;
+    }
+    .tab-btn .tab-icon {
+      font-size: 22px;
+    }
+    .tab-btn.active {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* 模态框 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .modal-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal {
+      background: var(--card-bg);
+      border-radius: 18px;
+      padding: 24px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      transform: scale(0.9);
+      transition: transform 0.3s;
+    }
+    .modal-overlay.show .modal {
+      transform: scale(1);
+    }
+    .modal h3 {
+      font-size: 18px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .modal .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .modal .btn-group .btn {
+      flex: 1;
+    }
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      background: var(--card-bg);
+      color: var(--text);
+      padding: 12px 24px;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      z-index: 300;
+      font-size: 14px;
+      font-weight: 500;
+      transition: transform 0.4s ease;
+      border: 1px solid var(--border);
+    }
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+    .toast.success {
+      border-color: var(--primary);
+    }
+
+    /* 达标庆祝 */
+    .celebrate-icon {
+      font-size: 48px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    @media (min-width: 480px) {
+      body {
+        border-left: 1px solid var(--border);
+        border-right: 1px solid var(--border);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>⚖️ 体重记录</h1>
+    <div class="header-actions">
+      <button class="icon-btn" id="darkToggle" title="切换深色模式">🌙</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ===== 记录页面 ===== -->
+    <section id="tab-record" class="tab-content active">
+      <!-- 概览卡片 -->
+      <div class="card" id="overviewCard">
+        <div class="overview-grid">
+          <div class="overview-item">
+            <div class="label">当前体重</div>
+            <div class="value" id="currentWeight">--</div>
+          </div>
+          <div class="overview-item">
+            <div class="label">目标差值</div>
+            <div class="value" id="goalDiff">--</div>
+          </div>
+        </div>
+        <div class="progress-section" id="progressSection">
+          <div class="progress-header">
+            <span id="progressLabel">达成目标 0%</span>
+            <span id="progressDetail">--</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-bar-inner" id="progressBar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 记录表单 -->
+      <div class="card">
+        <div class="card-title">✏️ 新增记录</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="inputWeight">体重</label>
+            <input type="number" id="inputWeight" step="0.1" placeholder="例如 72.5" required>
+          </div>
+          <div class="form-group" style="flex:0.6">
+            <label for="inputUnit">&nbsp;</label>
+            <input type="text" id="inputUnit" disabled style="text-align:center;background:var(--bg);font-weight:600;">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="inputDate">日期</label>
+            <input type="datetime-local" id="inputDate">
+        </div>
+        <div class="form-group">
+          <label>备注（可选）</label>
+          <div class="note-options" id="recordNoteOptions">
+            <button class="note-opt" data-value="饭前">饭前</button>
+            <button class="note-opt" data-value="饭后">饭后</button>
+            <button class="note-opt" data-value="运动后">运动后</button>
+            <button class="note-opt" data-value="">自定义</button>
+          </div>
+          <input type="text" id="inputNote" placeholder="输入自定义备注..." maxlength="100" style="display:none;margin-top:8px;">
+        </div>
+        <button class="btn btn-primary" id="saveBtn">保存记录</button>
+      </div>
+
+      <!-- 记录列表 -->
+      <div class="card">
+        <div class="card-title">📋 历史记录</div>
+        <div id="recordList"></div>
+      </div>
+    </section>
+
+    <!-- ===== 趋势页面 ===== -->
+    <section id="tab-trend" class="tab-content">
+      <div class="card">
+        <div class="card-title">📈 体重趋势</div>
+        <div class="chart-period" id="chartPeriod">
+          <button data-days="7" class="active">7天</button>
+          <button data-days="30">30天</button>
+          <button data-days="90">90天</button>
+        </div>
+        <div class="chart-container">
+          <canvas id="weightChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📊 数据统计</div>
+        <div class="stats-grid" id="statsGrid">
+          <div class="stat-item">
+            <div class="stat-value max" id="statMax">--</div>
+            <div class="stat-label">最高</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value min" id="statMin">--</div>
+            <div class="stat-label">最低</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value avg" id="statAvg">--</div>
+            <div class="stat-label">平均</div>
+          </div>
+        </div>
+        <div class="trend-list" id="trendList"></div>
+      </div>
+    </section>
+
+    <!-- ===== 设置页面 ===== -->
+    <section id="tab-settings" class="tab-content">
+      <div class="card">
+        <div class="card-title">🎯 目标管理</div>
+        <div class="form-group">
+          <label for="targetWeight">目标体重</label>
+          <input type="number" id="targetWeight" step="0.1" placeholder="例如 65">
+        </div>
+        <button class="btn btn-primary" id="saveTargetBtn">保存目标</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">⚙️ 单位设置</div>
+        <div class="unit-options" id="unitOptions">
+          <button class="unit-option active" data-unit="kg">公斤 (kg)</button>
+          <button class="unit-option" data-unit="jin">斤</button>
+          <button class="unit-option" data-unit="lb">磅 (lb)</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">💾 数据管理</div>
+
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;line-height:1.8;">
+          <div>📦 存储方式：浏览器本地存储 (localStorage)</div>
+          <div id="storageInfo">记录数：-- | 数据大小：--</div>
+          <div style="margin-top:4px;padding:8px 10px;background:var(--bg);border-radius:8px;word-break:break-all;">
+            <span style="font-weight:600;">⚠️</span> 清除浏览器"站点数据"会丢失所有记录，请定期备份！
+          </div>
+        </div>
+
+        <button class="btn btn-outline" id="exportCsvBtn" style="margin-bottom:8px;">📥 导出 CSV</button>
+        <button class="btn btn-outline" id="exportJsonBtn" style="margin-bottom:8px;">💾 导出 JSON 备份</button>
+        <button class="btn btn-outline" id="importJsonBtn">📂 导入 JSON 备份</button>
+        <input type="file" id="importFileInput" accept=".json" style="display:none;">
+
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--text-secondary);line-height:1.8;">
+          <div>📂 保存目录：<span id="savePathDisplay">浏览器模式（不支持自定义路径）</span></div>
+          <button class="btn btn-outline btn-sm" id="pickSaveDirBtn" style="display:none;margin-top:6px;">📁 选择保存目录</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Tab 栏 -->
+  <nav class="tab-bar">
+    <button class="tab-btn active" data-tab="record">
+      <span class="tab-icon">📝</span>
+      <span>记录</span>
+    </button>
+    <button class="tab-btn" data-tab="trend">
+      <span class="tab-icon">📈</span>
+      <span>趋势</span>
+    </button>
+    <button class="tab-btn" data-tab="settings">
+      <span class="tab-icon">⚙️</span>
+      <span>设置</span>
+    </button>
+  </nav>
+
+  <!-- 编辑模态框 -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <h3>✏️ 编辑记录</h3>
+      <div class="form-group">
+        <label for="editWeight">体重</label>
+        <input type="number" id="editWeight" step="0.1" required>
+      </div>
+      <div class="form-group">
+        <label for="editDate">日期</label>
+          <input type="datetime-local" id="editDate">
+      </div>
+      <div class="form-group">
+        <label>备注</label>
+        <div class="note-options" id="editNoteOptions">
+          <button class="note-opt" data-value="饭前">饭前</button>
+          <button class="note-opt" data-value="饭后">饭后</button>
+          <button class="note-opt" data-value="运动后">运动后</button>
+          <button class="note-opt" data-value="">自定义</button>
+        </div>
+        <input type="text" id="editNote" placeholder="输入自定义备注..." maxlength="100" style="display:none;margin-top:8px;">
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-outline" id="editCancelBtn">取消</button>
+        <button class="btn btn-primary" id="editSaveBtn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 达标庆祝模态框 -->
+  <div class="modal-overlay" id="goalModal">
+    <div class="modal" style="text-align:center;">
+      <div class="celebrate-icon">🎉</div>
+      <h3>恭喜达成目标！</h3>
+      <p style="color:var(--text-secondary);margin-bottom:18px;font-size:14px;">
+        你已经成功达到了目标体重，继续坚持！
+      </p>
+      <button class="btn btn-primary" id="goalModalClose">太棒了！</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ==================== 数据层 ====================
+    const RECORDS_KEY = 'weight_records';
+    const SETTINGS_KEY = 'weight_settings';
+
+    function getRecords() {
+      try {
+        return JSON.parse(localStorage.getItem(RECORDS_KEY)) || [];
+      } catch { return []; }
+    }
+
+    function saveRecords(records) {
+      localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
+    }
+
+    function getSettings() {
+      try {
+        return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {
+          targetWeight: null,
+          unit: 'kg'
+        };
+      } catch {
+        return { targetWeight: null, unit: 'kg' };
+      }
+    }
+
+    function saveSettings(settings) {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    }
+
+    // ==================== 单位换算 ====================
+    const KG_TO_JIN = 2;
+    const KG_TO_LB = 2.20462;
+
+    function convertFromKg(kg, unit) {
+      if (unit === 'jin') return kg * KG_TO_JIN;
+      if (unit === 'lb') return kg * KG_TO_LB;
+      return kg;
+    }
+
+    function convertToKg(value, unit) {
+      if (unit === 'jin') return value / KG_TO_JIN;
+      if (unit === 'lb') return value / KG_TO_LB;
+      return value;
+    }
+
+    function getUnitLabel(unit) {
+      if (unit === 'jin') return '斤';
+      if (unit === 'lb') return 'lb';
+      return 'kg';
+    }
+
+    function formatWeight(kg, unit) {
+      const v = convertFromKg(kg, unit);
+      return v % 1 === 0 ? v.toString() : v.toFixed(1);
+    }
+
+    // ==================== 统计计算 ====================
+    function getStats(records) {
+      if (!records.length) return null;
+      const weights = records.map(r => r.weight);
+      const max = Math.max(...weights);
+      const min = Math.min(...weights);
+      const avg = weights.reduce((a, b) => a + b, 0) / weights.length;
+      return { max, min, avg };
+    }
+
+    function getTrend(records, days) {
+      if (records.length < 2) return null;
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      const filtered = records.filter(r => new Date(r.date) >= cutoff).sort((a, b) => a.date.localeCompare(b.date));
+      if (filtered.length < 2) return null;
+      const first = filtered[0].weight;
+      const last = filtered[filtered.length - 1].weight;
+      return { first, last, diff: last - first };
+    }
+
+    // ==================== 工具函数 ====================
+    function todayStr() {
+      const d = new Date();
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0') + 'T' +
+        String(d.getHours()).padStart(2, '0') + ':' +
+        String(d.getMinutes()).padStart(2, '0');
+    }
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast' + (type ? ' ' + type : '');
+      el.classList.add('show');
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    // ==================== 图表 ====================
+    let chartInstance = null;
+    let currentChartPeriod = 7;
+
+    function renderChart(records, unit) {
+      const days = currentChartPeriod;
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      let filtered = records.filter(r => new Date(r.date) >= cutoff)
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      if (filtered.length === 0) {
+        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        return;
+      }
+
+      const labels = filtered.map(r => r.date.slice(5, 10));
+      const data = filtered.map(r => convertFromKg(r.weight, unit));
+
+      const ctx = document.getElementById('weightChart').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: '体重 (' + getUnitLabel(unit) + ')',
+            data,
+            borderColor: '#2ecc71',
+            backgroundColor: 'rgba(46,204,113,0.1)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 4,
+            pointBackgroundColor: '#2ecc71',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            borderWidth: 2.5
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { font: { size: 11 }, color: '#95a5a6' }
+            },
+            y: {
+              grid: { color: 'rgba(0,0,0,0.06)' },
+              ticks: {
+                font: { size: 11 },
+                color: '#95a5a6',
+                callback: function(v) { return v + ' ' + getUnitLabel(unit); }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ==================== 渲染函数 ====================
+    function renderOverview(records, settings) {
+      const elCurrent = document.getElementById('currentWeight');
+      const elDiff = document.getElementById('goalDiff');
+      const elProgressLabel = document.getElementById('progressLabel');
+      const elProgressDetail = document.getElementById('progressDetail');
+      const elProgressBar = document.getElementById('progressBar');
+
+      if (!records.length) {
+        elCurrent.innerHTML = '-- <span class="unit">' + getUnitLabel(settings.unit) + '</span>';
+        elDiff.innerHTML = '-- <span class="unit">' + getUnitLabel(settings.unit) + '</span>';
+        elProgressLabel.textContent = '暂无数据';
+        elProgressBar.style.width = '0%';
+        return;
+      }
+
+      const latest = records.sort((a, b) => b.date.localeCompare(a.date))[0].weight;
+      const curDisplay = formatWeight(latest, settings.unit);
+      elCurrent.innerHTML = curDisplay + ' <span class="unit">' + getUnitLabel(settings.unit) + '</span>';
+
+      const target = settings.targetWeight;
+      if (target && records.length > 0) {
+        const diff = target - latest;
+        const diffDisplay = formatWeight(Math.abs(diff), settings.unit);
+        const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
+        elDiff.innerHTML = sign + diffDisplay + ' <span class="unit">' + getUnitLabel(settings.unit) + '</span>';
+        elDiff.className = 'value ' + (diff > 0 ? 'danger' : (diff < 0 ? 'success' : ''));
+
+        const sorted = [...records].sort((a, b) => a.date.localeCompare(b.date));
+        const startWeight = sorted[0].weight;
+        let progress = 0;
+        if (target < startWeight) {
+          progress = Math.min(100, Math.max(0, (startWeight - latest) / (startWeight - target) * 100));
+        } else if (target > startWeight) {
+          progress = Math.min(100, Math.max(0, (latest - startWeight) / (target - startWeight) * 100));
+        } else {
+          progress = 100;
+        }
+        elProgressBar.style.width = progress + '%';
+        elProgressLabel.textContent = '达成目标 ' + Math.round(progress) + '%';
+        elProgressDetail.textContent = '起始 ' + formatWeight(startWeight, settings.unit) +
+          ' → 目标 ' + formatWeight(target, settings.unit) + ' ' + getUnitLabel(settings.unit);
+      } else {
+        elDiff.innerHTML = '-- <span class="unit">' + getUnitLabel(settings.unit) + '</span>';
+        elDiff.className = 'value';
+        elProgressBar.style.width = '0%';
+        elProgressLabel.textContent = '请在设置中设定目标体重';
+        elProgressDetail.textContent = '';
+      }
+    }
+
+    function renderList(records, settings) {
+      const el = document.getElementById('recordList');
+      if (!records.length) {
+        el.innerHTML = '<div class="empty-state"><div class="icon">📋</div>还没有记录，开始记录你的体重吧！</div>';
+        return;
+      }
+
+      const sorted = [...records].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+      el.innerHTML = sorted.map(r => {
+        const w = formatWeight(r.weight, settings.unit);
+        const note = r.note ? r.note : '';
+        const dateDisplay = r.date.slice(5, 10) + ' ' + r.date.slice(11, 16);
+        return '<div class="record-item" data-id="' + r.id + '">' +
+          '<span class="record-date">' + dateDisplay + '</span>' +
+          '<span class="record-weight">' + w + ' ' + getUnitLabel(settings.unit) + '</span>' +
+          '<span class="record-note">' + (note ? escapeHtml(note) : '') + '</span>' +
+          '<div class="record-actions">' +
+          '<button class="edit-btn" title="编辑">✏️</button>' +
+          '<button class="delete-btn" title="删除">🗑️</button>' +
+          '</div></div>';
+      }).join('');
+
+      el.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const item = this.closest('.record-item');
+          const id = Number(item.dataset.id);
+          openEditModal(id);
+        });
+      });
+      el.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const item = this.closest('.record-item');
+          const id = Number(item.dataset.id);
+          deleteRecord(id);
+        });
+      });
+    }
+
+    function setupNoteOptions(containerId, inputId) {
+      const container = document.getElementById(containerId);
+      const input = document.getElementById(inputId);
+      container.querySelectorAll('.note-opt').forEach(btn => {
+        btn.addEventListener('click', function() {
+          container.querySelectorAll('.note-opt').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          const val = this.dataset.value;
+          if (val === '') {
+            input.style.display = 'block';
+            input.value = '';
+            input.focus();
+          } else {
+            input.style.display = 'none';
+            input.value = val;
+          }
+        });
+      });
+    }
+
+    function setNoteValue(containerId, inputId, value) {
+      const container = document.getElementById(containerId);
+      const input = document.getElementById(inputId);
+      const matched = container.querySelector('.note-opt[data-value="' + value + '"]');
+      container.querySelectorAll('.note-opt').forEach(b => b.classList.remove('active'));
+      if (matched) {
+        matched.classList.add('active');
+        input.style.display = 'none';
+        input.value = value;
+      } else {
+        const custom = container.querySelector('.note-opt[data-value=""]');
+        custom.classList.add('active');
+        input.style.display = 'block';
+        input.value = value || '';
+      }
+    }
+
+    function resetNoteInput() {
+      const container = document.getElementById('recordNoteOptions');
+      container.querySelectorAll('.note-opt').forEach(b => b.classList.remove('active'));
+      const input = document.getElementById('inputNote');
+      input.style.display = 'none';
+      input.value = '';
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function renderStats(records, settings) {
+      const stats = getStats(records);
+      if (!stats) {
+        document.getElementById('statMax').textContent = '--';
+        document.getElementById('statMin').textContent = '--';
+        document.getElementById('statAvg').textContent = '--';
+        document.getElementById('trendList').innerHTML = '';
+        return;
+      }
+      document.getElementById('statMax').textContent = formatWeight(stats.max, settings.unit);
+      document.getElementById('statMin').textContent = formatWeight(stats.min, settings.unit);
+      document.getElementById('statAvg').textContent = formatWeight(stats.avg, settings.unit);
+
+      const el = document.getElementById('trendList');
+      const periods = [
+        { days: 7, label: '近 7 天' },
+        { days: 30, label: '近 30 天' },
+        { days: 90, label: '近 90 天' }
+      ];
+      el.innerHTML = periods.map(p => {
+        const trend = getTrend(records, p.days);
+        if (!trend) {
+          return '<div class="trend-item"><span>' + p.label + '</span><span class="change">数据不足</span></div>';
+        }
+        const diff = trend.diff;
+        const display = (diff >= 0 ? '+' : '') + formatWeight(diff, settings.unit);
+        const cls = diff > 0 ? 'positive' : (diff < 0 ? 'negative' : '');
+        return '<div class="trend-item"><span>' + p.label + '</span><span class="change ' + cls + '">' +
+          display + ' ' + getUnitLabel(settings.unit) + '</span></div>';
+      }).join('');
+    }
+
+    function renderSettings(settings) {
+      if (settings.targetWeight) {
+        document.getElementById('targetWeight').value = settings.targetWeight;
+      } else {
+        document.getElementById('targetWeight').value = '';
+      }
+      document.querySelectorAll('.unit-option').forEach(el => {
+        el.classList.toggle('active', el.dataset.unit === settings.unit);
+      });
+      document.getElementById('inputUnit').value = getUnitLabel(settings.unit);
+      document.getElementById('inputWeight').placeholder = '例如 ' + formatWeight(70, settings.unit);
+    }
+
+    function checkGoal(records, settings) {
+      if (!settings.targetWeight || !records.length) return;
+      const sorted = [...records].sort((a, b) => b.date.localeCompare(b.date));
+      const latest = sorted[0].weight;
+      const start = sorted[sorted.length - 1].weight;
+
+      const isLoss = settings.targetWeight < start;
+      const achieved = isLoss ? latest <= settings.targetWeight : latest >= settings.targetWeight;
+
+      if (achieved) {
+        document.getElementById('goalModal').classList.add('show');
+      }
+    }
+
+    // ==================== 编辑功能 ====================
+    let editingId = null;
+
+    function openEditModal(id) {
+      const records = getRecords();
+      const record = records.find(r => r.id === id);
+      if (!record) return;
+      editingId = id;
+      document.getElementById('editWeight').value = record.weight;
+      document.getElementById('editDate').value = record.date;
+      setNoteValue('editNoteOptions', 'editNote', record.note || '');
+      document.getElementById('editModal').classList.add('show');
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModal').classList.remove('show');
+      editingId = null;
+    }
+
+    function saveEdit() {
+      const weight = parseFloat(document.getElementById('editWeight').value);
+      const date = document.getElementById('editDate').value;
+      const note = document.getElementById('editNote').value.trim();
+      if (!weight || !date) { showToast('请填写体重和日期'); return; }
+      if (editingId === null) return;
+      let records = getRecords();
+      const idx = records.findIndex(r => r.id === editingId);
+      if (idx === -1) return;
+      records[idx] = { ...records[idx], weight, date, note };
+      saveRecords(records);
+      closeEditModal();
+      refreshAll();
+      showToast('已更新记录');
+    }
+
+    function deleteRecord(id) {
+      if (!confirm('确定要删除这条记录吗？')) return;
+      let records = getRecords();
+      records = records.filter(r => r.id !== id);
+      saveRecords(records);
+      refreshAll();
+      showToast('已删除记录');
+    }
+
+    // ==================== 刷新所有 ====================
+    function refreshAll() {
+      const records = getRecords();
+      const settings = getSettings();
+      renderOverview(records, settings);
+      renderList(records, settings);
+      renderStats(records, settings);
+      renderSettings(settings);
+      renderStorageInfo();
+      if (document.getElementById('tab-trend').classList.contains('active')) {
+        renderChart(records, settings.unit);
+      }
+    }
+
+    // ==================== Tab 切换 ====================
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + tab).classList.add('active');
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.querySelector('.tab-btn[data-tab="' + tab + '"]').classList.add('active');
+
+      if (tab === 'trend') {
+        const records = getRecords();
+        const settings = getSettings();
+        renderChart(records, settings.unit);
+      }
+    }
+
+    // ==================== Android 原生桥接 ====================
+    const isAndroid = typeof window.FileBridge !== 'undefined';
+
+    function initAndroidBridge() {
+      if (!isAndroid) return;
+      document.getElementById('pickSaveDirBtn').style.display = '';
+      document.getElementById('savePathDisplay').textContent = '尚未选择（点击下方按钮设置）';
+      const path = FileBridge.getSavePath();
+      if (path) {
+        document.getElementById('savePathDisplay').textContent = path;
+      }
+      document.getElementById('pickSaveDirBtn').addEventListener('click', function() {
+        FileBridge.pickSaveDirectory();
+      });
+    }
+
+    function onSavePathChanged(path) {
+      document.getElementById('savePathDisplay').textContent = path;
+      showToast('保存目录已设置');
+    }
+
+    function onFilePicked(content) {
+      try {
+        const data = JSON.parse(content);
+        if (!data.records || !Array.isArray(data.records)) {
+          showToast('无效的备份文件'); return;
+        }
+        if (!confirm('确定要导入 ' + data.records.length + ' 条记录？当前数据将被覆盖！')) return;
+        saveRecords(data.records);
+        if (data.settings) saveSettings(data.settings);
+        refreshAll();
+        showToast('导入成功，共 ' + data.records.length + ' 条记录');
+      } catch {
+        showToast('文件解析失败');
+      }
+    }
+
+    // ==================== 存储信息 ====================
+    function renderStorageInfo() {
+      const records = getRecords();
+      const dataStr = localStorage.getItem(RECORDS_KEY) || '[]';
+      const size = new Blob([dataStr]).size;
+      document.getElementById('storageInfo').textContent =
+        '记录数：' + records.length + ' 条 | 数据大小：' +
+        (size < 1024 ? size + ' B' : (size / 1024).toFixed(1) + ' KB');
+    }
+
+    // ==================== 导出/导入 JSON 备份 ====================
+    function exportJSON() {
+      const records = getRecords();
+      const settings = getSettings();
+      const data = { records, settings, exportedAt: new Date().toISOString() };
+      const content = JSON.stringify(data, null, 2);
+      const filename = '体重记录_备份_' + todayStr().replace('T', '_') + '.json';
+
+      if (isAndroid) {
+        const ok = FileBridge.saveFile(filename, content, 'application/json');
+        showToast(ok ? '备份已保存到所选目录' : '保存失败，请先设置保存目录');
+        return;
+      }
+
+      const blob = new Blob([content], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      showToast('备份导出成功');
+    }
+
+    function importJSON(file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!data.records || !Array.isArray(data.records)) {
+            showToast('无效的备份文件'); return;
+          }
+          if (data.records.length === 0) {
+            showToast('备份文件中没有数据'); return;
+          }
+          if (!confirm('确定要导入 ' + data.records.length + ' 条记录？当前数据将被覆盖！')) return;
+          saveRecords(data.records);
+          if (data.settings) saveSettings(data.settings);
+          refreshAll();
+          showToast('导入成功，共 ' + data.records.length + ' 条记录');
+        } catch {
+          showToast('文件解析失败，请选择正确的备份文件');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ==================== 导出 CSV ====================
+    function exportCSV() {
+      const records = getRecords();
+      if (!records.length) { showToast('暂无数据可导出'); return; }
+      const settings = getSettings();
+      const sorted = [...records].sort((a, b) => a.date.localeCompare(b.date));
+      const unit = settings.unit;
+      const unitLabel = getUnitLabel(unit);
+      let csv = '日期,体重(' + unitLabel + '),备注\n';
+      sorted.forEach(r => {
+        const w = formatWeight(r.weight, unit);
+        const note = (r.note || '').replace(/,/g, '，');
+        csv += r.date + ',' + w + ',' + note + '\n';
+      });
+      const filename = '体重记录_' + todayStr().replace('T', '_') + '.csv';
+
+      if (isAndroid) {
+        const ok = FileBridge.saveFile(filename, csv, 'text/csv');
+        showToast(ok ? 'CSV 已保存到所选目录' : '保存失败，请先设置保存目录');
+        return;
+      }
+
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      showToast('导出成功');
+    }
+
+    // ==================== 深色模式 ====================
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark');
+      const isDark = document.body.classList.contains('dark');
+      localStorage.setItem('weight_dark', isDark ? '1' : '0');
+      document.getElementById('darkToggle').textContent = isDark ? '☀️' : '🌙';
+    }
+
+    // ==================== 初始化 ====================
+    function init() {
+      // 深色模式恢复
+      if (localStorage.getItem('weight_dark') === '1') {
+        document.body.classList.add('dark');
+        document.getElementById('darkToggle').textContent = '☀️';
+      }
+
+      // 设置默认日期
+      document.getElementById('inputDate').value = todayStr();
+
+      // 初始渲染
+      refreshAll();
+
+      // Android 桥接
+      initAndroidBridge();
+
+      // 备注选项
+      setupNoteOptions('recordNoteOptions', 'inputNote');
+      setupNoteOptions('editNoteOptions', 'editNote');
+
+      // Tab 切换
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          switchTab(this.dataset.tab);
+        });
+      });
+
+      // 保存记录
+      document.getElementById('saveBtn').addEventListener('click', function() {
+        const weight = parseFloat(document.getElementById('inputWeight').value);
+        if (!weight || weight <= 0) { showToast('请输入有效体重'); return; }
+        const date = document.getElementById('inputDate').value;
+        const note = document.getElementById('inputNote').value.trim();
+        const settings = getSettings();
+
+        const kgWeight = convertToKg(weight, settings.unit);
+
+        let records = getRecords();
+        const newRecord = {
+          id: Date.now(),
+          weight: Math.round(kgWeight * 100) / 100,
+          date,
+          note,
+          createdAt: new Date().toISOString()
+        };
+        records.push(newRecord);
+        saveRecords(records);
+
+        document.getElementById('inputWeight').value = '';
+        resetNoteInput();
+
+        refreshAll();
+        showToast('记录已保存', 'success');
+
+        checkGoal(getRecords(), getSettings());
+      });
+
+      // 图表周期切换
+      document.querySelectorAll('#chartPeriod button').forEach(btn => {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('#chartPeriod button').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          currentChartPeriod = parseInt(this.dataset.days);
+          const records = getRecords();
+          const settings = getSettings();
+          renderChart(records, settings.unit);
+        });
+      });
+
+      // 保存目标
+      document.getElementById('saveTargetBtn').addEventListener('click', function() {
+        const target = parseFloat(document.getElementById('targetWeight').value);
+        if (!target || target <= 0) { showToast('请输入有效目标体重'); return; }
+        const settings = getSettings();
+        settings.targetWeight = target;
+        saveSettings(settings);
+        refreshAll();
+        showToast('目标已保存');
+      });
+      document.getElementById('targetWeight').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') document.getElementById('saveTargetBtn').click();
+      });
+
+      // 单位切换
+      document.querySelectorAll('.unit-option').forEach(el => {
+        el.addEventListener('click', function() {
+          const unit = this.dataset.unit;
+          const settings = getSettings();
+          settings.unit = unit;
+          saveSettings(settings);
+          refreshAll();
+          showToast('已切换为 ' + getUnitLabel(unit));
+        });
+      });
+
+      // 深色模式
+      document.getElementById('darkToggle').addEventListener('click', toggleDarkMode);
+
+      // 导出 / 导入
+      document.getElementById('exportCsvBtn').addEventListener('click', exportCSV);
+      document.getElementById('exportJsonBtn').addEventListener('click', exportJSON);
+      document.getElementById('importJsonBtn').addEventListener('click', function() {
+        if (isAndroid) {
+          FileBridge.pickFile();
+          showToast('请选择备份文件');
+        } else {
+          document.getElementById('importFileInput').click();
+        }
+      });
+      document.getElementById('importFileInput').addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+          importJSON(this.files[0]);
+          this.value = '';
+        }
+      });
+
+      // 编辑模态框
+      document.getElementById('editCancelBtn').addEventListener('click', closeEditModal);
+      document.getElementById('editSaveBtn').addEventListener('click', saveEdit);
+      document.getElementById('editModal').addEventListener('click', function(e) {
+        if (e.target === this) closeEditModal();
+      });
+
+      // 达标模态框
+      document.getElementById('goalModalClose').addEventListener('click', function() {
+        document.getElementById('goalModal').classList.remove('show');
+      });
+      document.getElementById('goalModal').addEventListener('click', function(e) {
+        if (e.target === this) this.classList.remove('show');
+      });
+
+      // 回车保存
+      document.getElementById('inputWeight').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') document.getElementById('saveBtn').click();
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

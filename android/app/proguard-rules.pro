@@ -1,0 +1,3 @@
+﻿-keepattributes *Annotation*
+-keepattributes JavascriptInterface
+-keep class com.weightapp.** { *; }
