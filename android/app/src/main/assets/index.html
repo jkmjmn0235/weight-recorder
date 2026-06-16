@@ -683,10 +683,11 @@
         <div class="card-title">💾 数据管理</div>
 
         <div style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;line-height:1.8;">
-          <div>📦 存储方式：浏览器本地存储 (localStorage)</div>
+          <div>📦 存储方式：<span id="storageMode">浏览器本地存储 (localStorage)</span></div>
+          <div>📂 存储路径：<span id="storagePathDisplay">--</span></div>
           <div id="storageInfo">记录数：-- | 数据大小：--</div>
           <div style="margin-top:4px;padding:8px 10px;background:var(--bg);border-radius:8px;word-break:break-all;">
-            <span style="font-weight:600;">⚠️</span> 清除浏览器"站点数据"会丢失所有记录，请定期备份！
+            <span style="font-weight:600;">⚠️</span> <span id="storageWarning">清除浏览器"站点数据"会丢失所有记录，请定期备份！</span>
           </div>
         </div>
 
@@ -769,28 +770,30 @@
     const SETTINGS_KEY = 'weight_settings';
 
     function getRecords() {
-      try {
-        return JSON.parse(localStorage.getItem(RECORDS_KEY)) || [];
-      } catch { return []; }
+      if (isAndroid) {
+        try { return JSON.parse(FileBridge.nativeGetItem(RECORDS_KEY)) || []; } catch { return []; }
+      }
+      try { return JSON.parse(localStorage.getItem(RECORDS_KEY)) || []; } catch { return []; }
     }
 
     function saveRecords(records) {
-      localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
+      const data = JSON.stringify(records);
+      if (isAndroid) { FileBridge.nativeSetItem(RECORDS_KEY, data); }
+      else { localStorage.setItem(RECORDS_KEY, data); }
     }
 
     function getSettings() {
-      try {
-        return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {
-          targetWeight: null,
-          unit: 'kg'
-        };
-      } catch {
-        return { targetWeight: null, unit: 'kg' };
-      }
+      let raw;
+      if (isAndroid) { raw = FileBridge.nativeGetItem(SETTINGS_KEY); }
+      else { raw = localStorage.getItem(SETTINGS_KEY); }
+      try { return JSON.parse(raw) || { targetWeight: null, unit: 'kg' }; }
+      catch { return { targetWeight: null, unit: 'kg' }; }
     }
 
     function saveSettings(settings) {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      const data = JSON.stringify(settings);
+      if (isAndroid) { FileBridge.nativeSetItem(SETTINGS_KEY, data); }
+      else { localStorage.setItem(SETTINGS_KEY, data); }
     }
 
     // ==================== 单位换算 ====================
@@ -1200,6 +1203,27 @@
 
     function initAndroidBridge() {
       if (!isAndroid) return;
+
+      // 存储路径
+      document.getElementById('storagePathDisplay').textContent = FileBridge.getStoragePath();
+
+      // 从 localStorage 迁移到原生存储
+      const nativeRecords = FileBridge.nativeGetItem(RECORDS_KEY);
+      const nativeSettings = FileBridge.nativeGetItem(SETTINGS_KEY);
+      if (!nativeRecords || nativeRecords === '[]') {
+        const localRecords = localStorage.getItem(RECORDS_KEY);
+        if (localRecords && localRecords !== '[]') {
+          FileBridge.nativeSetItem(RECORDS_KEY, localRecords);
+        }
+      }
+      if (!nativeSettings || nativeSettings === '{}') {
+        const localSettings = localStorage.getItem(SETTINGS_KEY);
+        if (localSettings && localSettings !== '{}') {
+          FileBridge.nativeSetItem(SETTINGS_KEY, localSettings);
+        }
+      }
+
+      // 保存目录按钮
       document.getElementById('pickSaveDirBtn').style.display = '';
       document.getElementById('savePathDisplay').textContent = '尚未选择（点击下方按钮设置）';
       const path = FileBridge.getSavePath();
@@ -1235,11 +1259,15 @@
     // ==================== 存储信息 ====================
     function renderStorageInfo() {
       const records = getRecords();
-      const dataStr = localStorage.getItem(RECORDS_KEY) || '[]';
-      const size = new Blob([dataStr]).size;
+      const raw = isAndroid ? FileBridge.nativeGetItem(RECORDS_KEY) : (localStorage.getItem(RECORDS_KEY) || '[]');
+      const size = new Blob([raw]).size;
       document.getElementById('storageInfo').textContent =
         '记录数：' + records.length + ' 条 | 数据大小：' +
         (size < 1024 ? size + ' B' : (size / 1024).toFixed(1) + ' KB');
+      if (isAndroid) {
+        document.getElementById('storageMode').textContent = 'App 内部存储 (文件)';
+        document.getElementById('storageWarning').textContent = '卸载 App 会删除数据，请定期备份！';
+      }
     }
 
     // ==================== 导出/导入 JSON 备份 ====================

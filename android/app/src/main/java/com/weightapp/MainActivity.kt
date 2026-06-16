@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.documentfile.provider.DocumentFile
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 
 class MainActivity : AppCompatActivity() {
@@ -123,6 +124,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     inner class AndroidBridge {
+
+        @JavascriptInterface
+        fun nativeGetItem(key: String): String {
+            return try {
+                val file = File(this@MainActivity.filesDir, "${key}.json")
+                if (file.exists()) file.readText() else ""
+            } catch (e: Exception) { "" }
+        }
+
+        @JavascriptInterface
+        fun nativeSetItem(key: String, value: String) {
+            try {
+                val file = File(this@MainActivity.filesDir, "${key}.json")
+                file.writeText(value)
+            } catch (_: Exception) { }
+        }
+
+        @JavascriptInterface
+        fun getStoragePath(): String {
+            return this@MainActivity.filesDir.absolutePath
+        }
 
         @JavascriptInterface
         fun pickSaveDirectory() {
