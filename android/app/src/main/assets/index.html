@@ -607,6 +607,12 @@
       white-space: nowrap;
       flex-shrink: 0;
     }
+    .event-duration {
+      font-size: 11px;
+      color: var(--primary);
+      font-weight: 500;
+      flex-shrink: 0;
+    }
     .event-actions {
       display: flex;
       gap: 4px;
@@ -813,9 +819,15 @@
           <button class="event-tag" data-value="🧘 冥想">🧘 冥想</button>
           <button class="event-tag" data-value="💪 健身">💪 健身</button>
         </div>
-        <div class="form-group">
-          <label for="inputEventDate">日期</label>
-          <input type="datetime-local" id="inputEventDate">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="inputEventDate">日期</label>
+            <input type="datetime-local" id="inputEventDate">
+          </div>
+          <div class="form-group" style="flex:0.5">
+            <label for="inputEventDuration">持续 (分钟)</label>
+            <input type="number" id="inputEventDuration" min="0" placeholder="选填" style="text-align:center;">
+          </div>
         </div>
         <button class="btn btn-primary" id="saveEventBtn">记录事件</button>
       </div>
@@ -893,9 +905,15 @@
         <label for="editEventName">事件名称</label>
         <input type="text" id="editEventName" maxlength="50">
       </div>
-      <div class="form-group">
-        <label for="editEventDate">日期</label>
-          <input type="datetime-local" id="editEventDate">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="editEventDate">日期</label>
+            <input type="datetime-local" id="editEventDate">
+        </div>
+        <div class="form-group" style="flex:0.5">
+          <label for="editEventDuration">持续 (分钟)</label>
+          <input type="number" id="editEventDuration" min="0" placeholder="选填" style="text-align:center;">
+        </div>
       </div>
       <div class="btn-group">
         <button class="btn btn-outline" id="editEventCancelBtn">取消</button>
@@ -1400,6 +1418,14 @@
       return days + ' 天前';
     }
 
+    function formatDuration(minutes) {
+      if (!minutes || minutes <= 0) return '';
+      if (minutes < 60) return minutes + ' 分钟';
+      const h = Math.floor(minutes / 60);
+      const m = minutes % 60;
+      return h + ' 小时' + (m ? m + ' 分钟' : '');
+    }
+
     function getUniqueEventNames(events) {
       const names = [...new Set(events.map(e => e.name))];
       return names.sort((a, b) => {
@@ -1452,8 +1478,10 @@
         const interval = computeTimeSinceLast(events, r.name);
         const intervalHtml = interval ? '<span class="event-interval">距上次 ' + interval + '</span>' : '';
         const dateDisplay = r.date.slice(5, 10) + ' ' + r.date.slice(11, 16);
+        const durationHtml = r.duration ? '<span class="event-duration">' + formatDuration(r.duration) + '</span>' : '';
         return '<div class="event-item" data-id="' + r.id + '">' +
           '<span class="event-name">' + escapeHtml(r.name) + '</span>' +
+          durationHtml +
           '<span class="event-date">' + dateDisplay + '</span>' +
           intervalHtml +
           '<div class="event-actions">' +
@@ -1489,6 +1517,7 @@
       editingEventId = id;
       document.getElementById('editEventName').value = record.name;
       document.getElementById('editEventDate').value = record.date;
+      document.getElementById('editEventDuration').value = record.duration || '';
       document.getElementById('editEventModal').classList.add('show');
     }
 
@@ -1500,12 +1529,13 @@
     function saveEditEvent() {
       const name = document.getElementById('editEventName').value.trim();
       const date = document.getElementById('editEventDate').value;
+      const duration = parseInt(document.getElementById('editEventDuration').value) || 0;
       if (!name || !date) { showToast('请填写事件名称和日期'); return; }
       if (editingEventId === null) return;
       let events = getEvents();
       const idx = events.findIndex(r => r.id === editingEventId);
       if (idx === -1) return;
-      events[idx] = { ...events[idx], name, date };
+      events[idx] = { ...events[idx], name, date, duration: duration > 0 ? duration : undefined };
       saveEvents(events);
       closeEditEventModal();
       renderEventForm();
@@ -1867,6 +1897,7 @@
       document.getElementById('saveEventBtn').addEventListener('click', function() {
         const name = document.getElementById('inputEventName').value.trim();
         const date = document.getElementById('inputEventDate').value;
+        const duration = parseInt(document.getElementById('inputEventDuration').value) || 0;
         if (!name) { showToast('请输入事件名称'); return; }
         if (!date) { showToast('请选择日期时间'); return; }
 
@@ -1875,6 +1906,7 @@
           id: Date.now(),
           name,
           date,
+          duration: duration > 0 ? duration : undefined,
           createdAt: new Date().toISOString()
         };
         events.push(newEvent);
