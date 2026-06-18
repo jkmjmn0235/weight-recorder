@@ -1339,7 +1339,7 @@
 
     function checkGoal(records, settings) {
       if (!settings.targetWeight || !records.length) return;
-      const sorted = [...records].sort((a, b) => b.date.localeCompare(b.date));
+      const sorted = [...records].sort((a, b) => b.date.localeCompare(a.date));
       const latest = sorted[0].weight;
       const start = sorted[sorted.length - 1].weight;
 
@@ -1404,7 +1404,7 @@
 
     function computeTimeSinceLast(events, eventName) {
       const filtered = events.filter(e => e.name === eventName)
-        .sort((a, b) => b.date.localeCompare(b.date));
+        .sort((a, b) => b.date.localeCompare(a.date));
       if (filtered.length < 2) return null;
       const diff = new Date(filtered[0].date) - new Date(filtered[1].date);
       if (diff < 0) return null;
@@ -1442,7 +1442,7 @@
 
       // 自动填充上次记录的事件
       if (events.length > 0) {
-        const sorted = [...events].sort((a, b) => b.date.localeCompare(b.date) || b.id - a.id);
+      const sorted = [...events].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
         const lastEvent = sorted[0].name;
         input.value = lastEvent;
       }
