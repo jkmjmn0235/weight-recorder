@@ -546,6 +546,89 @@
       margin-bottom: 12px;
     }
 
+    /* 事件记录 */
+    .event-tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .event-tag {
+      padding: 8px 16px;
+      border: 2px solid var(--border);
+      border-radius: 20px;
+      background: var(--card-bg);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .event-tag:active {
+      transform: scale(0.95);
+    }
+    .event-tag.active {
+      border-color: var(--primary);
+      background: rgba(46,204,113,0.1);
+      color: var(--primary);
+    }
+    .event-item {
+      display: flex;
+      align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+      gap: 10px;
+    }
+    .event-item:last-child {
+      border-bottom: none;
+    }
+    .event-name {
+      font-size: 16px;
+      font-weight: 600;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .event-date {
+      font-size: 12px;
+      color: var(--text-secondary);
+      min-width: 72px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .event-interval {
+      font-size: 11px;
+      color: var(--primary);
+      font-weight: 500;
+      min-width: 80px;
+      text-align: right;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .event-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .event-actions button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 15px;
+      padding: 4px 5px;
+      border-radius: 6px;
+      color: var(--text-secondary);
+      transition: background 0.2s;
+    }
+    .event-actions button:active {
+      background: var(--border);
+    }
+    .event-actions .delete-btn {
+      color: var(--danger);
+    }
+
     @media (min-width: 480px) {
       body {
         border-left: 1px solid var(--border);
@@ -711,6 +794,37 @@
         </div>
       </div>
     </section>
+
+    <!-- ===== 事件页面 ===== -->
+    <section id="tab-event" class="tab-content">
+      <div class="card">
+        <div class="card-title">⏱️ 新增事件</div>
+        <div class="form-group">
+          <label for="inputEventName">事件名称</label>
+          <input type="text" id="inputEventName" placeholder="输入或点选下方标签..." maxlength="50">
+        </div>
+        <div class="event-tags" id="eventTags">
+          <button class="event-tag" data-value="💧 喝水">💧 喝水</button>
+          <button class="event-tag" data-value="🍚 吃饭">🍚 吃饭</button>
+          <button class="event-tag" data-value="🏃 跑步">🏃 跑步</button>
+          <button class="event-tag" data-value="💊 吃药">💊 吃药</button>
+          <button class="event-tag" data-value="🛌 睡觉">🛌 睡觉</button>
+          <button class="event-tag" data-value="📖 阅读">📖 阅读</button>
+          <button class="event-tag" data-value="🧘 冥想">🧘 冥想</button>
+          <button class="event-tag" data-value="💪 健身">💪 健身</button>
+        </div>
+        <div class="form-group">
+          <label for="inputEventDate">日期</label>
+          <input type="datetime-local" id="inputEventDate">
+        </div>
+        <button class="btn btn-primary" id="saveEventBtn">记录事件</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📋 事件记录</div>
+        <div id="eventList"></div>
+      </div>
+    </section>
   </main>
 
   <!-- Tab 栏 -->
@@ -722,6 +836,10 @@
     <button class="tab-btn" data-tab="trend">
       <span class="tab-icon">📈</span>
       <span>趋势</span>
+    </button>
+    <button class="tab-btn" data-tab="event">
+      <span class="tab-icon">⏱️</span>
+      <span>事件</span>
     </button>
     <button class="tab-btn" data-tab="settings">
       <span class="tab-icon">⚙️</span>
@@ -767,6 +885,25 @@
     </div>
   </div>
 
+  <!-- 事件编辑模态框 -->
+  <div class="modal-overlay" id="editEventModal">
+    <div class="modal">
+      <h3>✏️ 编辑事件</h3>
+      <div class="form-group">
+        <label for="editEventName">事件名称</label>
+        <input type="text" id="editEventName" maxlength="50">
+      </div>
+      <div class="form-group">
+        <label for="editEventDate">日期</label>
+          <input type="datetime-local" id="editEventDate">
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-outline" id="editEventCancelBtn">取消</button>
+        <button class="btn btn-primary" id="editEventSaveBtn">保存</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 达标庆祝模态框 -->
   <div class="modal-overlay" id="goalModal">
     <div class="modal" style="text-align:center;">
@@ -786,6 +923,7 @@
     // ==================== 数据层 ====================
     const RECORDS_KEY = 'weight_records';
     const SETTINGS_KEY = 'weight_settings';
+    const EVENTS_KEY = 'event_records';
 
     function getRecords() {
       if (isAndroid) {
@@ -812,6 +950,19 @@
       const data = JSON.stringify(settings);
       if (isAndroid) { FileBridge.nativeSetItem(SETTINGS_KEY, data); }
       else { localStorage.setItem(SETTINGS_KEY, data); }
+    }
+
+    function getEvents() {
+      if (isAndroid) {
+        try { return JSON.parse(FileBridge.nativeGetItem(EVENTS_KEY)) || []; } catch { return []; }
+      }
+      try { return JSON.parse(localStorage.getItem(EVENTS_KEY)) || []; } catch { return []; }
+    }
+
+    function saveEvents(events) {
+      const data = JSON.stringify(events);
+      if (isAndroid) { FileBridge.nativeSetItem(EVENTS_KEY, data); }
+      else { localStorage.setItem(EVENTS_KEY, data); }
     }
 
     // ==================== 单位换算 ====================
@@ -1230,6 +1381,148 @@
       showToast('已删除记录');
     }
 
+    // ==================== 事件记录 ====================
+    let editingEventId = null;
+
+    function computeTimeSinceLast(events, eventName) {
+      const filtered = events.filter(e => e.name === eventName)
+        .sort((a, b) => b.date.localeCompare(b.date));
+      if (filtered.length < 2) return null;
+      const diff = new Date(filtered[0].date) - new Date(filtered[1].date);
+      if (diff < 0) return null;
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return '刚刚';
+      if (mins < 60) return mins + ' 分钟前';
+      const hours = Math.floor(mins / 60);
+      const remainMins = mins % 60;
+      if (hours < 24) return hours + ' 小时' + (remainMins ? remainMins + ' 分钟' : '') + '前';
+      const days = Math.floor(hours / 24);
+      return days + ' 天前';
+    }
+
+    function getUniqueEventNames(events) {
+      const names = [...new Set(events.map(e => e.name))];
+      return names.sort((a, b) => {
+        const aLast = events.filter(e => e.name === a).sort((x, y) => y.date.localeCompare(x.date))[0];
+        const bLast = events.filter(e => e.name === b).sort((x, y) => y.date.localeCompare(x.date))[0];
+        return bLast.date.localeCompare(aLast.date);
+      });
+    }
+
+    function renderEventForm() {
+      const events = getEvents();
+      const input = document.getElementById('inputEventName');
+      const tagsContainer = document.getElementById('eventTags');
+
+      // 自动填充上次记录的事件
+      if (events.length > 0) {
+        const sorted = [...events].sort((a, b) => b.date.localeCompare(b.date) || b.id - a.id);
+        const lastEvent = sorted[0].name;
+        input.value = lastEvent;
+      }
+
+      // 渲染标签（预设 + 自定义事件去重）
+      const preset = ['💧 喝水','🍚 吃饭','🏃 跑步','💊 吃药','🛌 睡觉','📖 阅读','🧘 冥想','💪 健身'];
+      const customNames = getUniqueEventNames(events).filter(n => !preset.includes(n));
+      const allNames = [...new Set([...preset, ...customNames])];
+
+      tagsContainer.innerHTML = allNames.map(name =>
+        '<button class="event-tag' + (name === input.value ? ' active' : '') + '" data-value="' + escapeAttr(name) + '">' + escapeHtml(name) + '</button>'
+      ).join('');
+
+      tagsContainer.querySelectorAll('.event-tag').forEach(tag => {
+        tag.addEventListener('click', function() {
+          tagsContainer.querySelectorAll('.event-tag').forEach(t => t.classList.remove('active'));
+          this.classList.add('active');
+          input.value = this.dataset.value;
+        });
+      });
+    }
+
+    function renderEventList() {
+      const events = getEvents();
+      const el = document.getElementById('eventList');
+      if (!events.length) {
+        el.innerHTML = '<div class="empty-state"><div class="icon">⏱️</div>还没有事件记录，开始记录吧！</div>';
+        return;
+      }
+
+      const sorted = [...events].sort((a, b) => b.date.localeCompare(b.date) || b.id - a.id);
+      el.innerHTML = sorted.map(r => {
+        const interval = computeTimeSinceLast(events, r.name);
+        const intervalHtml = interval ? '<span class="event-interval">距上次 ' + interval + '</span>' : '';
+        const dateDisplay = r.date.slice(5, 10) + ' ' + r.date.slice(11, 16);
+        return '<div class="event-item" data-id="' + r.id + '">' +
+          '<span class="event-name">' + escapeHtml(r.name) + '</span>' +
+          '<span class="event-date">' + dateDisplay + '</span>' +
+          intervalHtml +
+          '<div class="event-actions">' +
+          '<button class="edit-btn" title="编辑">✏️</button>' +
+          '<button class="delete-btn" title="删除">🗑️</button>' +
+          '</div></div>';
+      }).join('');
+
+      el.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const item = this.closest('.event-item');
+          const id = Number(item.dataset.id);
+          openEditEventModal(id);
+        });
+      });
+      el.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const item = this.closest('.event-item');
+          const id = Number(item.dataset.id);
+          deleteEvent(id);
+        });
+      });
+    }
+
+    function escapeAttr(str) {
+      return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function openEditEventModal(id) {
+      const events = getEvents();
+      const record = events.find(r => r.id === id);
+      if (!record) return;
+      editingEventId = id;
+      document.getElementById('editEventName').value = record.name;
+      document.getElementById('editEventDate').value = record.date;
+      document.getElementById('editEventModal').classList.add('show');
+    }
+
+    function closeEditEventModal() {
+      document.getElementById('editEventModal').classList.remove('show');
+      editingEventId = null;
+    }
+
+    function saveEditEvent() {
+      const name = document.getElementById('editEventName').value.trim();
+      const date = document.getElementById('editEventDate').value;
+      if (!name || !date) { showToast('请填写事件名称和日期'); return; }
+      if (editingEventId === null) return;
+      let events = getEvents();
+      const idx = events.findIndex(r => r.id === editingEventId);
+      if (idx === -1) return;
+      events[idx] = { ...events[idx], name, date };
+      saveEvents(events);
+      closeEditEventModal();
+      renderEventForm();
+      renderEventList();
+      showToast('事件已更新');
+    }
+
+    function deleteEvent(id) {
+      if (!confirm('确定要删除这条事件记录吗？')) return;
+      let events = getEvents();
+      events = events.filter(r => r.id !== id);
+      saveEvents(events);
+      renderEventForm();
+      renderEventList();
+      showToast('已删除事件');
+    }
+
     // ==================== 刷新所有 ====================
     function refreshAll() {
       const records = getRecords();
@@ -1255,6 +1548,9 @@
         const records = getRecords();
         const settings = getSettings();
         renderChart(records, settings.unit);
+      } else if (tab === 'event') {
+        renderEventForm();
+        renderEventList();
       }
     }
 
@@ -1270,6 +1566,7 @@
       // 从 localStorage 迁移到原生存储
       const nativeRecords = FileBridge.nativeGetItem(RECORDS_KEY);
       const nativeSettings = FileBridge.nativeGetItem(SETTINGS_KEY);
+      const nativeEvents = FileBridge.nativeGetItem(EVENTS_KEY);
       if (!nativeRecords || nativeRecords === '[]') {
         const localRecords = localStorage.getItem(RECORDS_KEY);
         if (localRecords && localRecords !== '[]') {
@@ -1280,6 +1577,12 @@
         const localSettings = localStorage.getItem(SETTINGS_KEY);
         if (localSettings && localSettings !== '{}') {
           FileBridge.nativeSetItem(SETTINGS_KEY, localSettings);
+        }
+      }
+      if (!nativeEvents || nativeEvents === '[]') {
+        const localEvents = localStorage.getItem(EVENTS_KEY);
+        if (localEvents && localEvents !== '[]') {
+          FileBridge.nativeSetItem(EVENTS_KEY, localEvents);
         }
       }
 
@@ -1309,7 +1612,10 @@
         if (!confirm('确定要导入 ' + data.records.length + ' 条记录？当前数据将被覆盖！')) return;
         saveRecords(data.records);
         if (data.settings) saveSettings(data.settings);
+        if (data.events) saveEvents(data.events);
         refreshAll();
+        renderEventForm();
+        renderEventList();
         showToast('导入成功，共 ' + data.records.length + ' 条记录');
       } catch {
         showToast('文件解析失败');
@@ -1334,7 +1640,8 @@
     function exportJSON() {
       const records = getRecords();
       const settings = getSettings();
-      const data = { records, settings, exportedAt: new Date().toISOString() };
+      const events = getEvents();
+      const data = { records, settings, events, exportedAt: new Date().toISOString() };
       const content = JSON.stringify(data, null, 2);
       const filename = '体重记录_备份_' + todayStr().replace('T', '_') + '.json';
 
@@ -1367,7 +1674,10 @@
           if (!confirm('确定要导入 ' + data.records.length + ' 条记录？当前数据将被覆盖！')) return;
           saveRecords(data.records);
           if (data.settings) saveSettings(data.settings);
+          if (data.events) saveEvents(data.events);
           refreshAll();
+          renderEventForm();
+          renderEventList();
           showToast('导入成功，共 ' + data.records.length + ' 条记录');
         } catch {
           showToast('文件解析失败，请选择正确的备份文件');
@@ -1425,6 +1735,7 @@
 
       // 设置默认日期
       document.getElementById('inputDate').value = todayStr();
+      document.getElementById('inputEventDate').value = todayStr();
 
       // 初始渲染
       refreshAll();
@@ -1550,6 +1861,40 @@
       });
       document.getElementById('goalModal').addEventListener('click', function(e) {
         if (e.target === this) this.classList.remove('show');
+      });
+
+      // 保存事件
+      document.getElementById('saveEventBtn').addEventListener('click', function() {
+        const name = document.getElementById('inputEventName').value.trim();
+        const date = document.getElementById('inputEventDate').value;
+        if (!name) { showToast('请输入事件名称'); return; }
+        if (!date) { showToast('请选择日期时间'); return; }
+
+        let events = getEvents();
+        const newEvent = {
+          id: Date.now(),
+          name,
+          date,
+          createdAt: new Date().toISOString()
+        };
+        events.push(newEvent);
+        saveEvents(events);
+        document.getElementById('inputEventName').value = '';
+        renderEventForm();
+        renderEventList();
+        showToast('事件已记录', 'success');
+      });
+
+      // 事件回车保存
+      document.getElementById('inputEventName').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') document.getElementById('saveEventBtn').click();
+      });
+
+      // 事件编辑模态框
+      document.getElementById('editEventCancelBtn').addEventListener('click', closeEditEventModal);
+      document.getElementById('editEventSaveBtn').addEventListener('click', saveEditEvent);
+      document.getElementById('editEventModal').addEventListener('click', function(e) {
+        if (e.target === this) closeEditEventModal();
       });
 
       // 回车保存
