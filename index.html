@@ -635,6 +635,28 @@
       color: var(--danger);
     }
 
+    .chart-mode {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .chart-mode button {
+      padding: 6px 16px;
+      border: 2px solid var(--border);
+      border-radius: 20px;
+      background: transparent;
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .chart-mode button.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
     @media (min-width: 480px) {
       body {
         border-left: 1px solid var(--border);
@@ -830,6 +852,40 @@
           </div>
         </div>
         <button class="btn btn-primary" id="saveEventBtn">记录事件</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📊 事件统计</div>
+        <div class="stats-grid" id="eventStats">
+          <div class="stat-item">
+            <div class="stat-value" id="estatTotal">--</div>
+            <div class="stat-label">总次数</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="estatToday">--</div>
+            <div class="stat-label">今日</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="estatTop" style="font-size:16px;">--</div>
+            <div class="stat-label">最频繁</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📈 事件趋势</div>
+        <div class="chart-period" id="eventChartPeriod">
+          <button data-days="7" class="active">7天</button>
+          <button data-days="30">30天</button>
+          <button data-days="90">90天</button>
+        </div>
+        <div class="chart-mode" id="eventChartMode">
+          <button data-mode="count" class="active">按次数</button>
+          <button data-mode="duration">按耗时</button>
+        </div>
+        <div class="chart-container">
+          <canvas id="eventChart"></canvas>
+        </div>
       </div>
 
       <div class="card">
@@ -1053,6 +1109,10 @@
     // ==================== 图表 ====================
     let chartInstance = null;
     let currentChartPeriod = 7;
+    let eventChartInstance = null;
+    let currentEventChartPeriod = 7;
+    let currentEventChartMode = 'count';
+    const EVENT_COLORS = ['#2ecc71','#3498db','#e67e22','#9b59b6','#1abc9c','#e74c3c','#f39c12','#95a5a6'];
 
     function renderChart(records, unit) {
       const days = currentChartPeriod;
@@ -1540,6 +1600,7 @@
       closeEditEventModal();
       renderEventForm();
       renderEventList();
+      renderEventVisuals();
       showToast('事件已更新');
     }
 
@@ -1550,7 +1611,147 @@
       saveEvents(events);
       renderEventForm();
       renderEventList();
+      renderEventVisuals();
       showToast('已删除事件');
+    }
+
+    // ==================== 事件可视化 ====================
+    function getEventStats(events) {
+      if (!events.length) return null;
+      const total = events.length;
+      const today = new Date();
+      const todayStr = today.getFullYear() + '-' +
+        String(today.getMonth()+1).padStart(2,'0') + '-' +
+        String(today.getDate()).padStart(2,'0');
+      const todayCount = events.filter(e => e.date.startsWith(todayStr)).length;
+      const countMap = {};
+      events.forEach(e => { countMap[e.name] = (countMap[e.name] || 0) + 1; });
+      let topName = '', topCount = 0;
+      for (const [name, cnt] of Object.entries(countMap)) {
+        if (cnt > topCount) { topName = name; topCount = cnt; }
+      }
+      return { total, today: todayCount, topName, topCount };
+    }
+
+    function getEventChartData(events, days, mode) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      const filtered = events.filter(e => new Date(e.date) >= cutoff)
+        .sort((a, b) => a.date.localeCompare(a.date));
+      if (!filtered.length) return null;
+
+      const dateMap = {};
+      const nameSet = new Set();
+      filtered.forEach(e => {
+        const d = e.date.slice(0, 10);
+        if (!dateMap[d]) dateMap[d] = {};
+        dateMap[d][e.name] = (dateMap[d][e.name] || 0) + (mode === 'duration' && e.duration ? e.duration : 1);
+        nameSet.add(e.name);
+      });
+
+      const nameTotal = {};
+      nameSet.forEach(n => {
+        nameTotal[n] = filtered.filter(e => e.name === n).reduce((s, e) => s + (mode === 'duration' && e.duration ? e.duration : 1), 0);
+      });
+      const sorted = Object.entries(nameTotal).sort((a, b) => b[1] - a[1]);
+      const top5 = sorted.slice(0, 5).map(s => s[0]);
+      const otherNames = sorted.slice(5).map(s => s[0]);
+
+      const labels = Object.keys(dateMap).sort();
+      const datasets = top5.map((name, i) => {
+        return {
+          label: name,
+          data: labels.map(d => dateMap[d][name] || 0),
+          backgroundColor: EVENT_COLORS[i % EVENT_COLORS.length],
+          borderRadius: 2
+        };
+      });
+
+      if (otherNames.length) {
+        const otherData = labels.map(d => {
+          return otherNames.reduce((sum, n) => sum + (dateMap[d][n] || 0), 0);
+        });
+        if (otherData.some(v => v > 0)) {
+          datasets.push({
+            label: '其他',
+            data: otherData,
+            backgroundColor: EVENT_COLORS[EVENT_COLORS.length - 1],
+            borderRadius: 2
+          });
+        }
+      }
+
+      return { labels, datasets };
+    }
+
+    function renderEventStats(events) {
+      const stats = getEventStats(events);
+      if (!stats) {
+        document.getElementById('estatTotal').textContent = '--';
+        document.getElementById('estatToday').textContent = '--';
+        document.getElementById('estatTop').textContent = '--';
+        return;
+      }
+      document.getElementById('estatTotal').textContent = stats.total;
+      document.getElementById('estatToday').textContent = stats.today;
+      document.getElementById('estatTop').textContent = stats.topName;
+    }
+
+    function renderEventChart(events) {
+      const days = currentEventChartPeriod;
+      const mode = currentEventChartMode;
+      const data = getEventChartData(events, days, mode);
+      const ctx = document.getElementById('eventChart').getContext('2d');
+
+      if (eventChartInstance) { eventChartInstance.destroy(); eventChartInstance = null; }
+
+      if (!data) return;
+
+      eventChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.labels,
+          datasets: data.datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'bottom',
+              labels: {
+                font: { size: 11 },
+                boxWidth: 12,
+                padding: 10
+              }
+            }
+          },
+          scales: {
+            x: {
+              stacked: true,
+              grid: { display: false },
+              ticks: { font: { size: 10 }, color: '#95a5a6' }
+            },
+            y: {
+              stacked: true,
+              beginAtZero: true,
+              grid: { color: 'rgba(0,0,0,0.06)' },
+              ticks: {
+                font: { size: 10 },
+                color: '#95a5a6',
+                precision: 0
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderEventVisuals() {
+      const events = getEvents();
+      renderEventStats(events);
+      renderEventChart(events);
     }
 
     // ==================== 刷新所有 ====================
@@ -1581,6 +1782,7 @@
       } else if (tab === 'event') {
         renderEventForm();
         renderEventList();
+        renderEventVisuals();
       }
     }
 
@@ -1831,6 +2033,26 @@
         });
       });
 
+      // 事件图表周期切换
+      document.querySelectorAll('#eventChartPeriod button').forEach(btn => {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('#eventChartPeriod button').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          currentEventChartPeriod = parseInt(this.dataset.days);
+          renderEventChart(getEvents());
+        });
+      });
+
+      // 事件图表模式切换
+      document.querySelectorAll('#eventChartMode button').forEach(btn => {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('#eventChartMode button').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          currentEventChartMode = this.dataset.mode;
+          renderEventChart(getEvents());
+        });
+      });
+
       // 保存目标
       document.getElementById('saveTargetBtn').addEventListener('click', function() {
         const target = parseFloat(document.getElementById('targetWeight').value);
@@ -1914,6 +2136,7 @@
         document.getElementById('inputEventName').value = '';
         renderEventForm();
         renderEventList();
+        renderEventVisuals();
         showToast('事件已记录', 'success');
       });
 
